@@ -1,0 +1,1 @@
+java -d64 -Xmx8g -Xms8g -server -XX:+UseConcMarkSweepGC -XX:-UseGCOverheadLimit -jar dist/Rubix.jar 

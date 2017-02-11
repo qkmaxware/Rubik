@@ -8,9 +8,14 @@ package rubix;
 import com.sun.glass.events.KeyEvent;
 import encoder.FileWriter;
 import encoder.OnesEncoder;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import plus.functional.async.AsyncPool;
+import plus.JSON.JSONobject;
+import plus.JSON.JSONparser;
+import plus.async.AsyncPool;
 import plus.game.Game;
 import plus.game.GameObject;
 import plus.game.GameScene;
@@ -21,6 +26,10 @@ import plus.graphics.RenderPanel;
 import plus.graphics.Transform;
 import plus.graphics.gui.Ui;
 import plus.graphics.gui.UiText;
+import plus.machinelearning.BackPropegation;
+import plus.machinelearning.ClassicNetwork;
+import plus.machinelearning.NeuralNetwork;
+import plus.machinelearning.TrainingData;
 import plus.math.Mathx;
 import plus.math.Vector3;
 import plus.system.Debug;
@@ -54,6 +63,8 @@ public class Program {
     private ConcurrentLinkedQueue<Integer> newCubeRequests = new ConcurrentLinkedQueue<Integer>(); //Deals with my occasional concurrent modification exception by doing it inside the game loop
     private final AsyncPool jobPool = new AsyncPool(2);
     
+    private ClassicNetwork network;
+    
     private Game game;
     private GameScene scene;
     private RenderPanel view;
@@ -64,6 +75,9 @@ public class Program {
     private CubeFace rightFace;
     private CubeFace frontFace;
     private CubeFace backFace;
+    
+    public String DataDir = "Data/Training";
+    public String NetworkDir = "Data/Networks";
     
     private static class CubeFace{
         public GameObject parent;
@@ -241,59 +255,8 @@ public class Program {
         UiText text = new UiText("<W,A,S,D> Rotates cube when window in focus", java.awt.Color.ORANGE);
         text.anchor = Ui.BottomLeft;
         text.origin = Ui.BottomLeft;
-        scene.AddUi(text);
+        scene.Instanciate(text);
         
-        /*
-        //Create the visual geometry which is rendered
-        Geometry topPlane = new Geometry(Geometry.plane);         //Create geometry for the top face of the cube
-        GameObject topObj = new GameObject("top", topPlane);
-        topObj.GetTransform().SetParent(RubixCubeObject.GetTransform());
-        topObj.GetTransform().SetLocalPosition(new Vector3(0,-1,0));
-        topObj.GetTransform().SetLocalEulerAngles(new Vector3(-90,180,0));
-        topObj.GetTransform().SetLocalScale(new Vector3(-1,1,1));
-        //scene.Instanciate(topObj);
-        
-        Geometry bottomPlane = new Geometry(Geometry.plane);         //Create geometry for the bottom face of the cubw
-        GameObject bottomObj = new GameObject("bottom", bottomPlane);
-        bottomObj.GetTransform().SetParent(RubixCubeObject.GetTransform());
-        bottomObj.GetTransform().SetLocalPosition(new Vector3(0,1,0));
-        bottomObj.GetTransform().SetLocalEulerAngles(new Vector3(90,180,0));
-        bottomObj.GetTransform().SetLocalScale(new Vector3(-1,1,1));
-        //scene.Instanciate(bottomObj);
-        
-        Geometry leftPlane = new Geometry(Geometry.plane);         //Create geometry for the left face of the cube
-        GameObject leftObj = new GameObject("left", leftPlane);
-        leftObj.GetTransform().SetParent(RubixCubeObject.GetTransform());
-        leftObj.GetTransform().SetLocalRotation(Quaternion.FromEulerAngle(new Vector3(0,90,0)));
-        leftObj.GetTransform().SetLocalScale(new Vector3(1,-1,1));
-        leftObj.GetTransform().SetLocalPosition(new Vector3(-1,0,0));
-        //scene.Instanciate(leftObj);
-        
-        Geometry rightPlane = new Geometry(Geometry.plane);         //Create geometry for the right face of the cube
-        GameObject rightObj = new GameObject("right", rightPlane);
-        rightObj.GetTransform().SetParent(RubixCubeObject.GetTransform());
-        rightObj.GetTransform().SetLocalRotation(Quaternion.FromEulerAngle(new Vector3(0,-90,0)));
-        rightObj.GetTransform().SetLocalPosition(new Vector3(1,0,0));
-        rightObj.GetTransform().SetLocalScale(new Vector3(1,-1,1));
-        //scene.Instanciate(rightObj);
-        
-        Geometry frontPlane = new Geometry(Geometry.plane);         //Create geometry for the front face of the cube
-        GameObject frontObj = new GameObject("front", frontPlane);
-        frontObj.GetTransform().SetParent(RubixCubeObject.GetTransform());
-        frontObj.GetTransform().SetLocalRotation(Quaternion.FromEulerAngle(new Vector3(0,0,180)));
-        frontObj.GetTransform().SetLocalScale(new Vector3(-1,1,1));
-        frontObj.GetTransform().SetLocalPosition(new Vector3(0,0,-1));
-        //scene.Instanciate(frontObj);
-        
-        Geometry backPlane = new Geometry(Geometry.plane);         //Create geometry for the back face of the cube
-        GameObject backObj = new GameObject("back", backPlane);
-        backObj.GetTransform().SetParent(RubixCubeObject.GetTransform());
-        backObj.GetTransform().SetLocalRotation(Quaternion.FromEulerAngle(new Vector3(0,-180,180)));
-        backObj.GetTransform().SetLocalPosition(new Vector3(0,0,1));
-        //scene.Instanciate(backObj);
-        
-        faces = new Geometry[]{topPlane, leftPlane, frontPlane, rightPlane, backPlane, bottomPlane};
-        RegenTextures();*/
     }
     
     public void Start(){
@@ -503,7 +466,7 @@ public class Program {
                         LinkedList<ISearchable> results = search.FindPath(cube, solved);
                         Debug.Log("--- --- Solved in "+results.size()+" moves");
                         results.addFirst(cube);
-                        FileWriter writer = new FileWriter(search.getClass().getSimpleName()+ "(#"+iterationId.get()+"-"+p+") on "+cubeSize+"x"+cubeSize+".csv");
+                        FileWriter writer = new FileWriter(this.DataDir+"/"+search.getClass().getSimpleName()+ "(#"+iterationId.get()+"-"+p+") on "+cubeSize+"x"+cubeSize+".csv");
                         for(int k = 0; k < results.size()-1; k++){
                             //TODO FIX INDEXING
                             rubix.Cube state = (rubix.Cube)results.get(k);
@@ -521,6 +484,91 @@ public class Program {
             };
             jobPool.Enqueue(job);
         }
+    }
+    
+    public NeuralNetwork CreateNetwork(double bias, int i, int o, int... h){
+        ClassicNetwork net = new ClassicNetwork(bias, i, o, h);
+        this.network = (net);
+        return net;
+    }
+    
+    public void LoadNetwork(String path){
+        try{
+            List<String> lines = Files.readAllLines(Paths.get(path));
+            String i = String.join("\n", lines);
+            ClassicNetwork network = ClassicNetwork.FromJSON((JSONobject)(new JSONparser()).Parse(i)); 
+            this.network = network;
+        }catch(Exception ex){
+            Debug.Log(ex);
+        }
+    }
+    
+    public void FeedNetwork(double[] ins){
+        if(this.network == null)
+            return;
+        
+        
+        double[] out = this.network.Feed(ins);
+        String outs = "";
+        for(int i = 0; i < out.length; i++){
+            outs+=((i != 0)?",":"")+out[i];
+        }
+        Debug.Log(outs);
+        
+    }
+    
+    public void TrainNetwork(TrainingData data){
+        if(data == null)
+            return;
+        
+        BackPropegation bp = new BackPropegation();
+        bp.Learn(network, 1, 100, 0.1, 0.1, data, null);
+    }
+    
+    public void SaveActiveNetwork(String name){
+        if(this.network == null)
+            return;
+        
+        FileWriter writer = new FileWriter(this.NetworkDir+"/"+name+".json");
+        writer.WriteLn(this.network.ToJSON().ToJSON());
+        writer.Save();
+        Debug.Log("Network saved to: "+this.NetworkDir+"/"+name+".json");
+    }
+    
+    public TrainingData CreateTrainingData(String path){
+        TrainingData data = null;
+        try{
+            TrainingData d = new TrainingData();
+            List<String> lines = Files.readAllLines(Paths.get(path));
+            
+            for(String line : lines){
+                String[] lns = line.split("\\|");
+                String in = lns[0];
+                String out = lns[1];
+                
+                String[] ins = in.split(",");
+                double[] ik = new double[ins.length];
+                for(int i = 0; i < ins.length; i++)
+                    ik[i] = Double.parseDouble(ins[i]);
+                
+                String[] outs = out.split(",");
+                double[] ik2 = new double[outs.length];
+                for(int i = 0; i < outs.length; i++)
+                    ik2[i] = Double.parseDouble(outs[i]);
+                
+                d.Add(ik, ik2);
+            }
+            
+            data = d;
+            
+        }catch(Exception ex){
+            Debug.Log(ex);
+        }
+        return data;
+    }
+    
+    public NeuralNetwork GetActiveNetwork(){
+        return this.network;
     }
     
     public RenderPanel GetViewport(){
