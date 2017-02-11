@@ -13,17 +13,27 @@ import java.util.ArrayList;
  */
 public class BackPropegation {
     
-    public void Learn(NeuralNetwork network, int epochs, int iterations, double learningRate, double accuracy, TrainingData training, TrainingData test){
+    public boolean Train(NeuralNetwork network, int epochs, int iterations, double learningRate, double accuracy, TrainingData training, TrainingData test){
         for(int e = 0; e < epochs; e++){
         
+            network.Randomize();
+            
+            //Training loop
             for(int i = 0; i < iterations; i++){
                 for(int t = 0; t < training.Count(); t++){
                     TrainingData.Pair pair = training.Get(t);
                     network.Learn(learningRate, pair);
                 }
             }
+            
+            //Test accuracy --if bad continue epock
+            double acc = 0;
+            if(acc < accuracy) {
+                //return true;
+            }
+            
         }
-        
+        return false;
     }
     
 }

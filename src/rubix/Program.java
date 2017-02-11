@@ -29,6 +29,7 @@ import plus.graphics.gui.UiText;
 import plus.machinelearning.BackPropegation;
 import plus.machinelearning.ClassicNetwork;
 import plus.machinelearning.NeuralNetwork;
+import plus.machinelearning.Sigmoid;
 import plus.machinelearning.TrainingData;
 import plus.math.Mathx;
 import plus.math.Vector3;
@@ -468,7 +469,6 @@ public class Program {
                         results.addFirst(cube);
                         FileWriter writer = new FileWriter(this.DataDir+"/"+search.getClass().getSimpleName()+ "(#"+iterationId.get()+"-"+p+") on "+cubeSize+"x"+cubeSize+".csv");
                         for(int k = 0; k < results.size()-1; k++){
-                            //TODO FIX INDEXING
                             rubix.Cube state = (rubix.Cube)results.get(k);
                             Spin move = ((rubix.Cube)results.get(k+1)).LastSpin();
                             //Encode and output to file size x size -> rng perterbations #2
@@ -487,7 +487,14 @@ public class Program {
     }
     
     public NeuralNetwork CreateNetwork(double bias, int i, int o, int... h){
-        ClassicNetwork net = new ClassicNetwork(bias, i, o, h);
+        ClassicNetwork.Config con = new ClassicNetwork.Config();
+        con.bias = bias;
+        con.hidden = h;
+        con.inputs = i;
+        con.outputs = o;
+        con.sigmoidFn = Sigmoid.tanh;
+        
+        ClassicNetwork net = new ClassicNetwork(con);
         this.network = (net);
         return net;
     }
@@ -522,7 +529,7 @@ public class Program {
             return;
         
         BackPropegation bp = new BackPropegation();
-        bp.Learn(network, 1, 100, 0.1, 0.1, data, null);
+        bp.Train(network, 1, 100, 0.1, 0.1, data, null);
     }
     
     public void SaveActiveNetwork(String name){

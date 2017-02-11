@@ -13,11 +13,6 @@ import plus.system.functional.Func1;
  */
 public class Sigmoid {
     
-    public static final Sigmoid tanhx = new Sigmoid(
-            (in)->{return (Math.tanh(in) + 1) / 2.0;},
-            (in)->{return (1 - Math.tanh(in)*Math.tanh(in)) / 2.0;}
-    );
-    
     public static final Sigmoid tanh = new Sigmoid(
             (in)->{return 1.7 * Math.tanh(0.6 * in);},
             (in)->{return 1.7 * 0.6  / Math.pow(Math.cosh(0.6 * in), 2);}

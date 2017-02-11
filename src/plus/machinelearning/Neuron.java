@@ -14,7 +14,6 @@ import plus.system.functional.Func1;
  */
 public class Neuron {
     
-    private double bias;
     private Func1<Double, Double> activationFn;
     private Func1<Double, Double> derivativeFn;
     
@@ -24,6 +23,9 @@ public class Neuron {
     private double inValue;
     private double outValue;
     private double error;
+    
+    private double biasweight;
+    private double bias;
     
     public Neuron(double bias){
         this.bias = bias;

@@ -13,6 +13,8 @@ public interface NeuralNetwork {
     
     public double[] Feed (double[] inputs);
     
+    public void Randomize();
+    
     public void Learn(double learningRate, TrainingData.Pair set);
     
 }

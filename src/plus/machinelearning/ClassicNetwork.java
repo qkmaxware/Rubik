@@ -10,6 +10,7 @@ import plus.JSON.JSONarray;
 import plus.JSON.JSONitem;
 import plus.JSON.JSONobject;
 import plus.system.Debug;
+import plus.system.Random;
 
 /**
  *
@@ -22,33 +23,73 @@ public class ClassicNetwork implements NeuralNetwork {
     
     private double bias;
     
+    private Config initial_config;
+    
     private Neuron[] inputLayer;
     private Neuron[] outputLayer;
     private Neuron[][] hiddenLayers; 
     
     public static void main(String[] args){
-        ClassicNetwork net = new ClassicNetwork(1,2,1,2);
+        Config con = new Config();
+        con.bias = 0;
+        con.inputs = 2;
+        con.outputs = 1;
+        con.hidden = new int[]{3};
+        con.sigmoidFn = Sigmoid.tanh;
+        
+        ClassicNetwork net = new ClassicNetwork(con);
         TrainingData data = new TrainingData();
         data.Add(new double[]{-1,-1}, new double[]{-1});
         data.Add(new double[]{-1,1}, new double[]{1});
         data.Add(new double[]{1,-1}, new double[]{1});
         data.Add(new double[]{1,1}, new double[]{-1});
        
-        for(int i = 0; i < 100; i++)
-            for(int j = 0; j<data.Count(); j++)
-                net.Learn(0.1, data.Get(j));
+        BackPropegation trainer = new BackPropegation();
+        trainer.Train(net, 1, 800, 0.1, 0.1, data, null);
         
-        Debug.Log(net.Feed(new double[]{-1,-1})[0]);
-        Debug.Log(net.Feed(new double[]{1,-1})[0]);
-        Debug.Log(net.Feed(new double[]{-1,1})[0]);
-        Debug.Log(net.Feed(new double[]{1,1})[0]);
+        double[] outs = new double[]{
+            net.Feed(new double[]{-1,-1})[0],
+            net.Feed(new double[]{-1,1})[0],
+            net.Feed(new double[]{1,-1})[0],
+            net.Feed(new double[]{1,1})[0]
+        };
+        
+        double[] round = new double[]{
+            Math.round(outs[0]),
+            Math.round(outs[1]),
+            Math.round(outs[2]),
+            Math.round(outs[3])
+        };
+        
+        Debug.Log("real: "+outs[0] + " round: "+round[0]+" expected: "+"-1");
+        Debug.Log("real: "+outs[1] + " round: "+round[1]+" expected: "+1);
+        Debug.Log("real: "+outs[2] + " round: "+round[2]+" expected: "+1);
+        Debug.Log("real: "+outs[3] + " round: "+round[3]+" expected: "+"-1");
         
     }
     
-    public ClassicNetwork(double bias, int inputs, int outputs, int ... hidden){
-        this.inputs = Clamp(inputs, Integer.MAX_VALUE, 1);
-        this.outputs = Clamp(outputs, this.inputs, 1);
+    public static class Config{
+        
+        public double bias;
+        public int inputs;
+        public int outputs;
+        public int[] hidden;
+        public Sigmoid sigmoidFn;
+        
+        public Config(){}
+        public static Config GetDefaults(){
+            Config Default = new Config();
+            Default.bias = 1;
+            Default.sigmoidFn = Sigmoid.tanh;
+            return Default;
+        }
+    }
+    
+    public ClassicNetwork(Config config){
+        this.inputs = Clamp(config.inputs, Integer.MAX_VALUE, 1);
+        this.outputs = Clamp(config.outputs, this.inputs, 1);
         this.bias = bias;
+        this.initial_config = config;
         
         //Create input layer
         inputLayer = new Neuron[this.inputs];
@@ -58,15 +99,16 @@ public class ClassicNetwork implements NeuralNetwork {
         
         //Create hidden layers
         Neuron[] lastLayer = inputLayer;
-        hiddenLayers = new Neuron[hidden.length+1][];
-        for(int l = 0; l < hidden.length; l++){
-            int size = Clamp(hidden[l], Integer.MAX_VALUE, 1);
+        hiddenLayers = new Neuron[config.hidden.length+1][];
+        for(int l = 0; l < config.hidden.length; l++){
+            int size = Clamp(config.hidden[l], Integer.MAX_VALUE, 1);
             Neuron[] layer = new Neuron[size];
             for(int i = 0; i < size; i++){
                 //Neuron with bias and with a sigmoid activation function + derivative
-                layer[i] = new Neuron(bias, 
-                        Sigmoid.tanh.GetFunction(),
-                        Sigmoid.tanh.GetDerivative()
+                layer[i] = new Neuron(
+                        bias, 
+                        config.sigmoidFn.GetFunction(),
+                        config.sigmoidFn.GetDerivative()
                 );
                 layer[i].Connect(lastLayer);
             }
@@ -90,6 +132,17 @@ public class ClassicNetwork implements NeuralNetwork {
             return max;
         else 
             return v;
+    }
+    
+    @Override
+    public void Randomize(){
+        for(int i = 0; i < this.hiddenLayers.length; i++){
+            for(int j = 0; j < this.hiddenLayers[i].length; j++){
+                for(Synapse connection : this.hiddenLayers[i][j].GetUpstream()){
+                    connection.SetWeight(Random.Range(-1.0f, 1.0f));
+                }
+            }
+        }
     }
     
     @Override
@@ -189,7 +242,14 @@ public class ClassicNetwork implements NeuralNetwork {
         }
         
         //Create the network
-        ClassicNetwork network = new ClassicNetwork(bias,inputs,outputs, hidden);
+        Config con = new Config();
+        con.bias = bias;
+        con.inputs = inputs;
+        con.outputs = outputs;
+        con.hidden = hidden;
+        con.sigmoidFn = Sigmoid.tanh;
+        
+        ClassicNetwork network = new ClassicNetwork(con);
              
         //Assign layer weights
         for(int i = 0; i < layers.Count(); i++){
