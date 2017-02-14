@@ -71,7 +71,7 @@ public class MatrixNetwork implements NeuralNetwork{
        
         for(int i = 0; i < 100; i++)
             for(int j = 0; j<data.Count(); j++)
-                net.Learn(0.1, data.Get(j));
+                net.Learn(0.1, 0, data.Get(j));
         
         Debug.Log(net.Feed(new double[]{-1,-1})[0]);
         Debug.Log(net.Feed(new double[]{1,-1})[0]);
@@ -130,7 +130,7 @@ public class MatrixNetwork implements NeuralNetwork{
     }
 
     @Override
-    public void Learn(double learningRate, TrainingData.Pair set) {
+    public void Learn(double learningRate, double momentum, TrainingData.Pair set) {
         double[] in = set.in;
         Matrix[] deltas = new Matrix[this.errors.length];
         

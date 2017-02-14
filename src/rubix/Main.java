@@ -110,7 +110,6 @@ public class Main {
                 System.out.println("path to training data: ");
                 String pt = scanner.nextLine().trim();
                 TrainingData o = p.CreateTrainingData(pt);
-                Debug.Log(o);
                 p.TrainNetwork(o);
             }
             else if(in.equals("unn")){

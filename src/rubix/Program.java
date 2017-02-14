@@ -26,7 +26,7 @@ import plus.graphics.RenderPanel;
 import plus.graphics.Transform;
 import plus.graphics.gui.Ui;
 import plus.graphics.gui.UiText;
-import plus.machinelearning.BackPropegation;
+import plus.machinelearning.NetworkTrainer;
 import plus.machinelearning.ClassicNetwork;
 import plus.machinelearning.NeuralNetwork;
 import plus.machinelearning.Sigmoid;
@@ -528,8 +528,8 @@ public class Program {
         if(data == null)
             return;
         
-        BackPropegation bp = new BackPropegation();
-        bp.Train(network, 1, 100, 0.1, 0.1, data, null);
+        NetworkTrainer bp = new NetworkTrainer();
+        bp.Train(network, 4, 100, 0.1, 0, 0.1, data, data);
     }
     
     public void SaveActiveNetwork(String name){

@@ -44,8 +44,8 @@ public class ClassicNetwork implements NeuralNetwork {
         data.Add(new double[]{1,-1}, new double[]{1});
         data.Add(new double[]{1,1}, new double[]{-1});
        
-        BackPropegation trainer = new BackPropegation();
-        trainer.Train(net, 1, 800, 0.1, 0.1, data, null);
+        NetworkTrainer trainer = new NetworkTrainer();
+        trainer.Train(net, 3, 10000, 0.1, 0, 0.1, data, data);
         
         double[] outs = new double[]{
             net.Feed(new double[]{-1,-1})[0],
@@ -85,6 +85,10 @@ public class ClassicNetwork implements NeuralNetwork {
         }
     }
     
+    /**
+     * Create a neural network from a configuration object
+     * @param config 
+     */
     public ClassicNetwork(Config config){
         this.inputs = Clamp(config.inputs, Integer.MAX_VALUE, 1);
         this.outputs = Clamp(config.outputs, this.inputs, 1);
@@ -123,6 +127,9 @@ public class ClassicNetwork implements NeuralNetwork {
             outputLayer[i] = new Neuron(0); //0 bias output neuron
             outputLayer[i].Connect(lastLayer);
         }
+        
+        //Properly randomize layer weights using range discussed in class
+        Randomize();
     }
     
     private int Clamp(int v, int max, int min){
@@ -134,17 +141,26 @@ public class ClassicNetwork implements NeuralNetwork {
             return v;
     }
     
+    /**
+     * Randomize layer connection weights
+     */
     @Override
     public void Randomize(){
         for(int i = 0; i < this.hiddenLayers.length; i++){
             for(int j = 0; j < this.hiddenLayers[i].length; j++){
+                int nums = this.hiddenLayers[i][j].Connections();
                 for(Synapse connection : this.hiddenLayers[i][j].GetUpstream()){
-                    connection.SetWeight(Random.Range(-1.0f, 1.0f));
+                    connection.SetWeight(Random.Range(-(float)(1.0/Math.sqrt(nums)), (float)(1.0/Math.sqrt(nums))));
                 }
             }
         }
     }
     
+    /**
+     * Provide inputs and perform a feed-forward action to obtain network output 
+     * @param inputs
+     * @return 
+     */
     @Override
     public double[] Feed(double[] inputs) {
         //Step one feed inputs to the input neurons; (zero padded)
@@ -169,8 +185,14 @@ public class ClassicNetwork implements NeuralNetwork {
         return outputs;
     }
     
+    /**
+     * Perform a single iteration of a learning loop
+     * @param learningRate
+     * @param momentum
+     * @param set 
+     */
     @Override
-    public void Learn(double learningRate, TrainingData.Pair set){
+    public void Learn(double learningRate, double momentum, TrainingData.Pair set){
             double[] in = set.in;
             
             double[] test = this.Feed(in);
@@ -220,16 +242,21 @@ public class ClassicNetwork implements NeuralNetwork {
                     Neuron n = layer[k];
                     
                     for(Synapse connection : n.GetUpstream()){
-                        connection.UpdateWeight();
+                        connection.UpdateWeight(momentum);
                     }
                 }
             }
     }
     
+    /**
+     * Create a neural network from a JSON encoded object
+     * @param obj
+     * @return 
+     */
     public static ClassicNetwork FromJSON(JSONobject obj){
         //Initial Configs
-        int inputs = (int)(((JSONitem)obj.Get("inputs")).Get());
-        int outputs = (int)(((JSONitem)obj.Get("outputs")).Get());
+        int inputs = ((Long)(((JSONitem)obj.Get("inputs")).Get())).intValue();
+        int outputs = ((Long)(((JSONitem)obj.Get("outputs")).Get())).intValue();
         double bias = (double)(((JSONitem)obj.Get("bias")).Get());
         int[] hidden = new int[(int)(((JSONitem)obj.Get("hidden")).Get())];
         
@@ -267,6 +294,10 @@ public class ClassicNetwork implements NeuralNetwork {
         return network;
     }
     
+    /**
+     * Convert a network to a JSON encoded object
+     * @return 
+     */
     public JSONobject ToJSON(){
         JSONobject obj = new JSONobject();
         

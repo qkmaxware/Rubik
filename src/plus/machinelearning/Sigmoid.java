@@ -33,6 +33,11 @@ public class Sigmoid {
             (in) -> {return 1.0 / Math.pow(Math.abs(in) + 1, 2);}
     );
     
+    public static final Sigmoid linear = new Sigmoid(
+            (in) -> {return in; },
+            (in) -> {return 1.0; }
+    );
+    
     
     private Func1<Double, Double> fn;
     private Func1<Double, Double> ddx;

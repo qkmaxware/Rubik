@@ -11,10 +11,24 @@ package plus.machinelearning;
  */
 public interface NeuralNetwork {
     
+    /**
+     * Provide inputs and perform a feed-forward action to obtain network output 
+     * @param inputs
+     * @return 
+     */
     public double[] Feed (double[] inputs);
     
+    /**
+     * Randomize layer connection weights
+     */
     public void Randomize();
     
-    public void Learn(double learningRate, TrainingData.Pair set);
+    /**
+     * Perform a single iteration of a learning loop
+     * @param learningRate
+     * @param momentum
+     * @param set 
+     */
+    public void Learn(double learningRate, double momentum, TrainingData.Pair set);
     
 }
