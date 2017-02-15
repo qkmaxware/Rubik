@@ -48,10 +48,9 @@ public class Synapse {
      */
     public void UpdateWeight(double momentum){
         //TODO momentum
-        //W = Wm + (1-a)*delta + a*oldDelta
+        //W = Wm + (1-a)*delta + a*oldDeltaSetDelta
         double W = this.GetWeight() + (1-momentum)*this.GetDelta() + momentum*this.lastDelta;
         this.SetWeight(W);
-        this.delta = 0;
     }
     
     /**

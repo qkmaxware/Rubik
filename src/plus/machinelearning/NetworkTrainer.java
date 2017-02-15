@@ -63,6 +63,8 @@ public class NetworkTrainer {
                 testAccuracy /= acc.length;
             }
             
+            Debug.Log("Training accurate to: "+testAccuracy);
+            
             //If within tolerance, don't do any more epochs. Return "true" for successful training
             if(testAccuracy < accuracy)
                 return true;

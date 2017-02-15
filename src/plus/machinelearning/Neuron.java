@@ -19,20 +19,16 @@ public class Neuron {
     
     private ArrayList<Synapse> inbound;
     private ArrayList<Synapse> outbound = new ArrayList<Synapse>();
+    private Synapse biasConnection;
     
     private double inValue;
     private double outValue;
     private double error;
     
-    private double biasweight;
-    private double bias;
-    
     /**
      * Create a neuron with a specific bias, but a linear activation function
-     * @param bias 
      */
-    public Neuron(double bias){
-        this.bias = bias;
+    public Neuron(){
         this.activationFn = (in) -> {return in;};
         this.derivativeFn = (in) -> {return 1.0;};
     }
@@ -43,8 +39,7 @@ public class Neuron {
      * @param activation
      * @param derivative 
      */
-    public Neuron(double bias, Func1<Double, Double> activation, Func1<Double, Double> derivative){
-        this.bias = bias;
+    public Neuron(Func1<Double, Double> activation, Func1<Double, Double> derivative){
         this.activationFn = activation;
         this.derivativeFn = derivative;
     }
@@ -65,6 +60,23 @@ public class Neuron {
             this.inbound.add(connection);
             ns[i].outbound.add(connection);
         }
+    }
+    
+    /**
+     * Connect this neuron to a bias neuron
+     * @param n 
+     */
+    public void ConnectBias(Neuron n){
+        Synapse s = new Synapse(n, this);
+        this.biasConnection = s;
+    }
+    
+    /**
+     * Get the connection from the bias neuron to this one
+     * @return 
+     */
+    public Synapse GetBias(){
+        return this.biasConnection;
     }
     
     /**
@@ -231,7 +243,7 @@ public class Neuron {
             net += connection.GetWeight() * connection.GetSource().GetValue();
         }
         
-        this.inValue = net + this.bias;
+        this.inValue = net + ((this.biasConnection != null) ? this.biasConnection.GetWeight() * this.biasConnection.GetSource().GetValue() : 0);
         this.outValue = this.activationFn.Invoke(this.inValue);
     }
     

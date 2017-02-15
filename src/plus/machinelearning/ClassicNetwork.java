@@ -21,13 +21,13 @@ public class ClassicNetwork implements NeuralNetwork {
     private int inputs;
     private int outputs;
     
-    private double bias;
-    
     private Config initial_config;
     
     private Neuron[] inputLayer;
     private Neuron[] outputLayer;
     private Neuron[][] hiddenLayers; 
+    
+    private Neuron bias;
     
     public static void main(String[] args){
         Config con = new Config();
@@ -92,13 +92,13 @@ public class ClassicNetwork implements NeuralNetwork {
     public ClassicNetwork(Config config){
         this.inputs = Clamp(config.inputs, Integer.MAX_VALUE, 1);
         this.outputs = Clamp(config.outputs, this.inputs, 1);
-        this.bias = bias;
+        this.bias = new Neuron(); this.bias.SetValue(config.bias);
         this.initial_config = config;
         
         //Create input layer
         inputLayer = new Neuron[this.inputs];
         for(int i = 0; i < inputLayer.length; i++){
-            inputLayer[i] = new Neuron(0);  //0 bias input neuron with no fire method
+            inputLayer[i] = new Neuron();  //0 bias input neuron with no fire method
         }
         
         //Create hidden layers
@@ -110,11 +110,11 @@ public class ClassicNetwork implements NeuralNetwork {
             for(int i = 0; i < size; i++){
                 //Neuron with bias and with a sigmoid activation function + derivative
                 layer[i] = new Neuron(
-                        bias, 
                         config.sigmoidFn.GetFunction(),
                         config.sigmoidFn.GetDerivative()
                 );
                 layer[i].Connect(lastLayer);
+                layer[i].ConnectBias(this.bias);
             }
             hiddenLayers[l] = layer;
             lastLayer = layer;
@@ -124,8 +124,9 @@ public class ClassicNetwork implements NeuralNetwork {
         outputLayer = new Neuron[this.outputs];
         hiddenLayers[hiddenLayers.length - 1] = outputLayer;
         for(int i = 0; i < outputLayer.length; i++){
-            outputLayer[i] = new Neuron(0); //0 bias output neuron
+            outputLayer[i] = new Neuron(); //Neuron with bias, but no activation function
             outputLayer[i].Connect(lastLayer);
+            outputLayer[i].ConnectBias(this.bias);
         }
         
         //Properly randomize layer weights using range discussed in class
@@ -149,9 +150,14 @@ public class ClassicNetwork implements NeuralNetwork {
         for(int i = 0; i < this.hiddenLayers.length; i++){
             for(int j = 0; j < this.hiddenLayers[i].length; j++){
                 int nums = this.hiddenLayers[i][j].Connections();
+                float range = (float)(1.0/Math.sqrt(nums));
+                //Set random connection weight
                 for(Synapse connection : this.hiddenLayers[i][j].GetUpstream()){
-                    connection.SetWeight(Random.Range(-(float)(1.0/Math.sqrt(nums)), (float)(1.0/Math.sqrt(nums))));
+                    connection.SetWeight(Random.Range(-range, range));
                 }
+                //Set random bias weight
+                if(hiddenLayers[i][j].GetBias() != null)
+                    hiddenLayers[i][j].GetBias().SetWeight(Random.Range(-range, range));
             }
         }
     }
@@ -209,6 +215,7 @@ public class ClassicNetwork implements NeuralNetwork {
                 for(Synapse connection : n.GetUpstream()){
                     connection.SetDelta(learningRate * n.GetError() * connection.GetSource().GetValue());
                 }
+                //Set delta for the bias neuron
             }
             
             //For each neuron in the hidden layer
@@ -221,16 +228,17 @@ public class ClassicNetwork implements NeuralNetwork {
                     double error = n.GetDerivative();
                     double sum = 0;
                     
-                    for(Synapse connection : n.GetDownstream()){
+                    for(Synapse connection : n.GetDownstream()){ //Next layer neurons
                         sum += connection.GetWeight() * connection.GetTarget().GetError();
                     }
                     
                     error *= sum;
                     n.SetError(error);
                     
-                    for(Synapse connection : n.GetUpstream()){
+                    for(Synapse connection : n.GetUpstream()){ //Previous layer neurons
                         connection.SetDelta(learningRate * connection.GetSource().GetValue() * n.GetError());
                     }
+                    //Set delta for the bias neuron
                 }
             }
             
@@ -241,9 +249,11 @@ public class ClassicNetwork implements NeuralNetwork {
                 for(int k = 0; k < layer.length; k++){
                     Neuron n = layer[k];
                     
+                    //Update weights for synapses
                     for(Synapse connection : n.GetUpstream()){
                         connection.UpdateWeight(momentum);
                     }
+                    //Update weights for the bias neuron
                 }
             }
     }
@@ -277,7 +287,8 @@ public class ClassicNetwork implements NeuralNetwork {
         con.sigmoidFn = Sigmoid.tanh;
         
         ClassicNetwork network = new ClassicNetwork(con);
-             
+        //TODO store / retrieve bias weights     
+        
         //Assign layer weights
         for(int i = 0; i < layers.Count(); i++){
             JSONobject layer = (JSONobject)layers.Get(i);
@@ -304,7 +315,7 @@ public class ClassicNetwork implements NeuralNetwork {
         obj.Add("inputs", new JSONitem(this.inputs));
         obj.Add("outputs", new JSONitem(this.outputs));
         obj.Add("hidden", new JSONitem(this.hiddenLayers.length-1));
-        obj.Add("bias", new JSONitem(this.bias));
+        obj.Add("bias", new JSONitem(this.bias.GetValue()));
         
         JSONarray weights = new JSONarray();
         obj.Add("layers", weights);
