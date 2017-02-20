@@ -216,6 +216,7 @@ public class ClassicNetwork implements NeuralNetwork {
                     connection.SetDelta(learningRate * n.GetError() * connection.GetSource().GetValue());
                 }
                 //Set delta for the bias neuron
+                n.GetBias().SetDelta(learningRate * n.GetError() * n.GetBias().GetSource().GetValue());
             }
             
             //For each neuron in the hidden layer
@@ -239,6 +240,7 @@ public class ClassicNetwork implements NeuralNetwork {
                         connection.SetDelta(learningRate * connection.GetSource().GetValue() * n.GetError());
                     }
                     //Set delta for the bias neuron
+                    n.GetBias().SetDelta(learningRate * n.GetBias().GetSource().GetValue() * n.GetError());
                 }
             }
             
@@ -254,6 +256,7 @@ public class ClassicNetwork implements NeuralNetwork {
                         connection.UpdateWeight(momentum);
                     }
                     //Update weights for the bias neuron
+                    n.GetBias().UpdateWeight(momentum);
                 }
             }
     }

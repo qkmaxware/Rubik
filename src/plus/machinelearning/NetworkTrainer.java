@@ -7,6 +7,7 @@ package plus.machinelearning;
 
 import java.util.ArrayList;
 import plus.system.Debug;
+import plus.system.Random;
 
 /**
  *
@@ -33,10 +34,8 @@ public class NetworkTrainer {
             
             //Training loop
             for(int i = 0; i < iterations; i++){
-                for(int t = 0; t < training.Count(); t++){
-                    TrainingData.Pair pair = training.Get(t);
-                    network.Learn(learningRate,momentum, pair); //0 momentum
-                }
+                TrainingData.Pair pair = training.Get(Random.Range(0, training.Count() - 1));
+                network.Learn(learningRate,momentum, pair);
             }
             
             //Compute network accuracy on testing data

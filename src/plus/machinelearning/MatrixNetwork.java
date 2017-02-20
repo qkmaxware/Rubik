@@ -17,10 +17,11 @@ import plus.system.functional.Func2;
 public class MatrixNetwork implements NeuralNetwork{
 
     private Matrix[] weights;
+    private Matrix[] bias_weights;
     private Matrix[] net;
     private Matrix[] activations;
     private Matrix[] derivatives;
-    private Matrix[] errors;
+    private Matrix[] deltas;
     
     private int inputs;
     private int outputs;
@@ -81,10 +82,11 @@ public class MatrixNetwork implements NeuralNetwork{
         this.inputs = Mathx.Clamp(config.inputs, 2, Integer.MAX_VALUE);
         this.outputs = Mathx.Clamp(config.outputs, 1, inputs - 1);
         
-        this.weights = new Matrix[config.hidden.length+1];
+        this.weights = new Matrix[config.hidden.length + 1];
+        this.bias_weights = new Matrix[config.hidden.length + 1];
         this.net = new Matrix[this.weights.length];
         this.activations = new Matrix[this.weights.length];
-        this.errors = new Matrix[this.weights.length];
+        this.deltas = new Matrix[this.weights.length];
         this.derivatives = new Matrix[this.weights.length];
         //this.deltas = new Matrix[this.weights.length];
         this.bias = config.bias;
@@ -92,19 +94,29 @@ public class MatrixNetwork implements NeuralNetwork{
         int size = inputs;
         for(int i = 0; i < weights.length - 1; i++){
             Matrix weight = Matrix.Random(size, config.hidden[i]);
+            Matrix biasW = Matrix.Row(new double[config.hidden[i]]).operate((in) -> { return 1.0; });
             this.weights[i] = weight;
+            this.bias_weights[i] = biasW;
             size = config.hidden[i];
         }
-        this.weights[this.weights.length - 1] = Matrix.Random(size, outputs);
         
+        this.weights[this.weights.length - 1] = Matrix.Random(size, outputs);
+        this.bias_weights[this.weights.length - 1] = Matrix.Row(new double[outputs]).operate((in) -> { return 1.0; });
     }
     
     @Override
     public void Randomize() {
-        for(Matrix w : this.weights){
+        for(int i = 0; i < this.weights.length; i++){
+            Matrix w = this.weights[i];
+            Matrix b = this.bias_weights[i];
+            
             int ins = w.GetWidth();
+            float r = (float)(1.0/Math.sqrt(ins));
             w.operate((in) -> {
-                return (double)Random.Range(-(float)(1.0/Math.sqrt(ins)), (float)(1.0/Math.sqrt(ins)));
+                return (double)Random.Range(-r, r);
+            });
+            b.operate((in) -> {
+                return (double)Random.Range(-r, r);
             });
         }
     }
@@ -117,11 +129,11 @@ public class MatrixNetwork implements NeuralNetwork{
         //Repeated matrix multiplication
         for(int i = 0; i < this.weights.length; i++){
             Matrix net = X.mul(this.weights[i]); //X * W
-            Matrix bias = new Matrix(net).operate((in)->{return this.bias;});
+            Matrix bias = this.bias_weights[i].operate((in) -> { return in * this.bias; });
             this.net[i] = net.add(bias);
             
             this.activations[i] = net.operate(this.sigmoid.GetFunction());
-            //this.derivatives[i] = net.operate(this.sigmoid.GetDerivative()).Transpose();
+            this.derivatives[i] = net.operate(this.sigmoid.GetDerivative());
             X = this.activations[i];
         }
         
@@ -155,11 +167,7 @@ public class MatrixNetwork implements NeuralNetwork{
         //Hidden layer recalc
         //Wl-1^T * deltal+1 DOT activation'(output)
         for(int i = this.weights.length - 2; i >= 0; i--){
-            Debug.Log(this.weights[i+1]);
-            Debug.Log(deltas[i+1]);
             Matrix prev = this.weights[i+1].mul(deltas[i+1]);
-            Debug.Log(prev);
-            Debug.Log(this.activations[i]);
             delta = Matrix.operate(
                     prev.Transpose(), 
                     this.activations[i].operate(this.sigmoid.GetDerivative()), 
