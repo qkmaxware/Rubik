@@ -15,6 +15,8 @@ import plus.system.Random;
  */
 public class NetworkTrainer {
     
+    private static java.util.Random rng = new java.util.Random();
+    
     /**
      * Perform a training iteration loop for a neural network based on training data
      * @param network
@@ -29,12 +31,13 @@ public class NetworkTrainer {
      */
     public boolean Train(NeuralNetwork network, int epochs, int iterations, double learningRate, double momentum, double accuracy, TrainingData training, TrainingData test){
         for(int e = 0; e < epochs; e++){
-            Debug.Log("Epoch 1");
+            Debug.Log("Epoch "+e);
             network.Randomize();
             
             //Training loop
             for(int i = 0; i < iterations; i++){
-                TrainingData.Pair pair = training.Get(Random.Range(0, training.Count() - 1));
+                int id = rng.nextInt(training.Count());
+                TrainingData.Pair pair = training.Get(id);
                 network.Learn(learningRate,momentum, pair);
             }
             
@@ -55,7 +58,6 @@ public class NetworkTrainer {
                 
                 if(acc != null)
                     for(int i = 0; i < acc.length; i++){
-                        acc[i] = acc[i]/test.Count();
                         testAccuracy += acc[i];
                     }
                 
