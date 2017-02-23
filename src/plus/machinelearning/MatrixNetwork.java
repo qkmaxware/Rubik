@@ -66,6 +66,7 @@ public class MatrixNetwork {
         });
         Matrix results = Matrix.Column(new double[]{-1,1,1,-1});
         
+        
         /*
         //Working data
         Matrix data = new Matrix(new double[][]{
@@ -79,7 +80,7 @@ public class MatrixNetwork {
         for(int i = 0; i < 1000; i++){
             net.Learn(0.1, 0, data, results);
             Matrix a = net.Feed(data);
-            Debug.Log(i+": "+a.toString());
+            //Debug.Log(i+": "+a.toString());
         }
         Matrix test = (net.Feed(data));
         Debug.Log("real");
@@ -87,7 +88,7 @@ public class MatrixNetwork {
         Debug.Log("calculated");
         Debug.Log(test);
         Debug.Log("error");
-        Debug.Log(test.sub(results).operate((in) -> {return (double)Math.round(in);}));
+        Debug.Log(results.sub(test).operate((in) -> {return (double)Math.round(in);}));
     }
     
     public MatrixNetwork(Config conf){
@@ -174,37 +175,33 @@ public class MatrixNetwork {
         Matrix[] dJs = new Matrix[size];
         
         //For output layer
-        //(y(exp) - Y(out)) * dY(out)/dW(out)
-        // (*) 
-        //f'(z(out))
-        // = 
-        //delta out
-        Matrix delta_out = Matrix.operate(
+        Matrix hhout = Xs[size - 1].Transpose(); //hidden out = this in (before weights)
+        Matrix d3 = Matrix.operate(
                 test.sub(expected), //add? sub?
                 Zs[size - 1].operate(this.activationFn.GetDerivative()),
-                (a,b) -> {return a * b; }
+                (a,b) -> {return a * b;}
         );
-        Matrix dZdW_out = As[size - 2].Transpose();
-        Matrix dJdW_out = Matrix.mul(dZdW_out, delta_out);
-        ds[size - 1] = delta_out;
-        dJs[size - 1] = dJdW_out;
+        
+        Matrix dsw2 = Matrix.mul(hhout, d3);
+        
+        ds[size - 1] = d3;
+        dJs[size - 1] = dsw2;
         
         //Hidden layers
         for(int i = size - 2; i >= 0; i--){
-            Matrix dZdA_h = weights[i+1].Transpose();
-            Matrix dAdZ_h = Zs[i].operate(this.activationFn.GetDerivative());
-            Matrix dZdW = Xs[i].Transpose();
-            Matrix del = ds[i+1];
-                
-            Matrix delta_h = Matrix.operate(
-                    del.mul(dZdA_h),
-                    dAdZ_h,
+            Matrix finaledges = weights[i+1].Transpose();
+            Matrix hiddenlayerin = Zs[i].operate(this.activationFn.GetDerivative());
+            Matrix trans = Xs[i].Transpose();
+            
+            Matrix d2 = Matrix.operate(
+                    Matrix.mul(ds[i+1], finaledges),
+                    hiddenlayerin, 
                     (a,b) -> {return a * b;}
             );
-            Matrix dJdW_h = dZdW.mul(delta_h);
+            Matrix dsw1 = Matrix.mul(trans, d2);
             
-            ds[i] = delta_h;
-            dJs[i] = dJdW_h;
+            ds[i] = d2;
+            dJs[i] = dsw1;
         }
         
         return dJs;
