@@ -16,7 +16,7 @@ public class Sigmoid implements Serializable{
     
     public static final Sigmoid tanh = new Sigmoid(
             (Func1<Double,Double> & Serializable)(in)->{return 1.7 * Math.tanh(0.6 * in);},
-            (Func1<Double,Double> & Serializable)(in)->{return 1.7 * 0.6  / Math.pow(Math.cosh(0.6 * in), 2);}
+            (Func1<Double,Double> & Serializable)(in)->{return (4.08 * Math.pow(Math.cosh(0.6*in), 2)) / ((1 + Math.cosh(1.2*in)) * (1 + Math.cosh(1.2*in)));}
     );
     
     public static final Sigmoid atan = new Sigmoid(
