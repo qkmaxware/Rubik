@@ -6,6 +6,7 @@
 package rubix;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -25,7 +26,6 @@ import plus.JSON.JSONobject;
 import plus.JSON.JSONparser;
 
 import plus.graphics.*;
-import plus.machinelearning.ClassicNetwork;
 import plus.machinelearning.NeuralNetwork;
 import plus.machinelearning.TrainingData;
 import plus.system.Debug;
@@ -54,101 +54,16 @@ public class Main {
         }
     }
     
-    private static String defaultParam = "trainer";
-    
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        
-        if(args.length == 0)
-            args = new String[]{defaultParam};
-        
-        if(args[0].equals("trainer")){
-            StartConsoleApplication();
-        }else{
-            StartGuiApplication();
-        }
-    }
-    
-    private static void StartConsoleApplication(){
-        Scanner scanner = new Scanner(System.in);
-        boolean run = true;
-        System.out.println("Rubix Cube Application - Colin Halseth");
-        Program p = new Program();
-        
-        while(run){
-            System.out.println("------------------------------------------------");
-            System.out.println("Options { \n\tClose App (quit), \n\tNew NN (nnn), \n\tExport NN (enn), \n\tLoad NN (lnn) ,\n\tTrain NN (tnn) , \n\tTest/Use NN (unn) \n\tList Saved NN (listnn) \n\tList Saved Training Data (listdat)\n}");
-            
-            String in = scanner.nextLine().trim().toLowerCase();
-            
-            if(in.equals("quit")){
-                run = false;
-                break;
+        //Start gui on the swing thread
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+              StartGuiApplication();
             }
-            else if(in.equals("nnn")){
-                System.out.println("input size: ");
-                String i = scanner.nextLine().trim().toLowerCase();
-                System.out.println("output size: ");
-                String o = scanner.nextLine().trim().toLowerCase();
-                System.out.println("hidden layer size: ");
-                String h = scanner.nextLine().trim().toLowerCase();
-                
-                p.CreateNetwork(1, Integer.parseInt(i), Integer.parseInt(o), Integer.parseInt(h));
-            }
-            else if(in.equals("enn")){
-                System.out.println("save name: ");
-                String pt = scanner.nextLine().trim();
-                p.SaveActiveNetwork(pt);
-            }
-            else if(in.equals("lnn")){
-                System.out.println("path to JSON: ");
-                String pt = scanner.nextLine().trim();
-                p.LoadNetwork(pt);
-            }else if(in.equals("tnn")){
-                System.out.println("path to training data: ");
-                String pt = scanner.nextLine().trim();
-                TrainingData o = p.CreateTrainingData(pt);
-                p.TrainNetwork(o);
-            }
-            else if(in.equals("unn")){
-                System.out.println("Please enter your input values (comma separated)");
-                String pt = scanner.nextLine().trim().toLowerCase();
-                String[] dbls = pt.split(",");
-                double[] db = new double[dbls.length];
-                try{
-                    for(int i = 0; i < dbls.length; i++){
-                        db[i] = Double.parseDouble(dbls[i]);
-                    }
-                    p.FeedNetwork(db);
-                }catch(Exception ex){
-                    Debug.Log(ex);
-                }
-            }else if(in.equals("listnn")){
-                File folder = new File(p.NetworkDir);
-                File[] list = folder.listFiles();
-                String fils = "FILES: ";
-                for(int i = 0; i < list.length; i++){
-                    Debug.Log(list[i].getPath());
-                }
-            }else if(in.equals("listdat")){
-                File folder = new File(p.DataDir);
-                File[] list = folder.listFiles();
-                String fils = "FILES: ";
-                for(int i = 0; i < list.length; i++){
-                    Debug.Log(list[i].getPath());
-                }
-            }
-            
-            try{
-                Thread.sleep(4);
-            }catch(Exception e){
-            
-            }
-        }
-        
-        System.exit(0);
+        });
     }
     
     private static void StartGuiApplication(){
@@ -241,105 +156,70 @@ public class Main {
         
         //Neural network manager
         JFrame networkmgr = new JFrame();
+        final TrainingData data = new TrainingData();
+        final JFileChooser fc = new JFileChooser();
         networkmgr.setTitle("Neural Network Manager");
         networkmgr.setSize(640, 480);
         networkmgr.setLayout(new BorderLayout());
-        JLabel allnets = new JLabel("no active network");
-        JPanel selectnet = new JPanel();
-        JButton nNetwork = new JButton("New Network");
-        nNetwork.addActionListener((event)->{
-            JFrame n = new JFrame();
-            n.setTitle("Spooling Up New Network");
-            n.setSize(400, 200);
-            
-            JPanel pn = new JPanel();
-            pn.setLayout(new BoxLayout(pn, BoxLayout.Y_AXIS));
-            n.add(pn);
-            
-            JLabel label = new JLabel("Input Size");
-            JTextField inputs = new JTextField("2");
-            pn.add(label);
-            pn.add(inputs);
-            
-            label = new JLabel("Output Size");
-            JTextField outss = new JTextField("1");
-            pn.add(label);
-            pn.add(outss);
-            
-            label = new JLabel("Hidden Layer Sizes (size 1, size 2 ...)");
-            JTextField hid = new JTextField("2");
-            pn.add(label);
-            pn.add(hid);
-            
-            JButton start = new JButton("Spool Network");
-            pn.add(start);
-            start.addActionListener((e) -> {
-                try{
-                    int in = Integer.parseInt(inputs.getText());
-                    int out = Integer.parseInt(outss.getText());
-                    
-                    String[] h = hid.getText().split(",");
-                    int[] hidden = new int[h.length];
-                    String k = "";
-                    for(int i = 0; i < h.length; i++){
-                        hidden[i] = Integer.parseInt(h[i]);
-                        k += ((i != 0)? "x" : "")+h[i];
-                    }
-                    
-                    NeuralNetwork net = p.CreateNetwork(1, in, out, hidden);
-                    allnets.setText(in+"x"+k+"x"+out+ " network");
-                    n.setVisible(false);
-                    n.dispose();
-                }catch(Exception ex){
-                    Debug.Log(ex);
-                }
-            });
-            
-            n.setVisible(true);
-            
-        });
         
-        JButton loadNetwork = new JButton("Load Network");
-        loadNetwork.addActionListener((e) -> {
-            JFileChooser fc = new JFileChooser();
-            fc.setAcceptAllFileFilterUsed(true);
-            fc.addChoosableFileFilter(new FileFilter(){
-                @Override
-                public boolean accept(File file) {
-                    if(file.isDirectory())
-                        return false;
-                    
-                    return true;
-                }
-
-                @Override
-                public String getDescription() {
-                    return "JSON Encoded Neural Network";
-                }
-            });
+        JTextArea txt = new JTextArea();
+        txt.setEditable(false);
+        txt.setPreferredSize(new Dimension(320,480));
+        JScrollPane left = new JScrollPane(txt);
+        networkmgr.add(left, BorderLayout.WEST);
+        
+        JTextArea txt2 = new JTextArea();
+        txt2.setEditable(false);
+        txt2.setPreferredSize(new Dimension(300,400));
+        JScrollPane right = new JScrollPane(txt2);
+        networkmgr.add(right, BorderLayout.EAST);
+        
+        JPanel options = new JPanel();
+        JButton cleard = new JButton("Clear Training Data");
+        cleard.addActionListener((evt) -> { 
+            data.Clear();
+            txt.setText("");
+            txt2.setText("");
+        });
+        JButton loadd = new JButton("Load Training Data");
+        loadd.addActionListener((evt) -> {
+            int returnVal = fc.showOpenDialog(null);
             
-            int retval = fc.showDialog(null, "Load Network");
-            if(retval == JFileChooser.APPROVE_OPTION){
-                File file = fc.getSelectedFile();
-                p.LoadNetwork(file.getPath());
+            if(returnVal != JFileChooser.APPROVE_OPTION){
+                return;
             }
+            
+            File selFile = fc.getSelectedFile();
+            try{
+            for(String line : Files.readAllLines(Paths.get(selFile.getPath()))){
+                String[] lines = line.split("\\|");
+                if(data.Add(String2Array(lines[0]), String2Array(lines[1]))){
+                    txt.append(lines[0]+"\n");
+                    txt2.append(lines[1]+"\n");
+                }
+            }}catch(Exception e){
+                Debug.Log(e);
+            };
         });
-        
+        JButton startd = new JButton("Train Network");
+        startd.addActionListener((evt) -> {
+            p.TrainNetwork(data);
+        });
+   
         JButton saveNetwork = new JButton("Save Network");
-        saveNetwork.addActionListener((e) ->  {
-            p.SaveActiveNetwork("EncodedNetwork");
+        saveNetwork.addActionListener((evt)->{
+            p.SaveActiveNetwork("RubixNetwork");
         });
         
-        selectnet.add(allnets);
-        selectnet.add(nNetwork);
-        selectnet.add(saveNetwork);
-        selectnet.add(loadNetwork);
-        networkmgr.add(selectnet, BorderLayout.NORTH);
+        options.add(cleard);
+        options.add(loadd);
+        options.add(startd);
+        options.add(saveNetwork);
+        networkmgr.add(options, BorderLayout.SOUTH);
         
         JButton shownetwork = new JButton("Show NN Manager");
         shownetwork.addActionListener((event)->{
             networkmgr.setVisible(true);
-            //allnets.setText();
         });
         
         panel.add(newCube,gbc);
@@ -352,19 +232,16 @@ public class Main {
         
         
         panel.add(new JLabel("Programs"),gbc);
-        
-        JButton dataBF = new JButton("Create Training Data (Breadth First)");
-        dataBF.addActionListener((event) -> {
-            JOptionPane.showMessageDialog(null, "This experiement will use Breadth First search to solve 1 rubix cube for 1 to 8 random moves. The output is saved to file.");
-            //RunProgramOne(new BreadthFirstSearch(), 3, 5, 8);
-            p.RunSolveLoop(new BreadthFirstSearch(), 3, 1, 8);
-        });
-        
+  
         JButton dataAS = new JButton("Create Training Data (A*)");
         dataAS.addActionListener((event) -> {
-            JOptionPane.showMessageDialog(null, "This experiement will use A* search to solve 5 rubix cubes. Each cube is pertubed between 1 and 8 times. The output is saved to file.");
+            JOptionPane.showMessageDialog(null, "Use A* search to solve many rubix cubes with different numbers of perturbations. The output is saved to file.");
+            String pert = JOptionPane.showInputDialog("Max perturbation depth", "3");
+            int pv = Integer.parseInt(pert);
+            String its = JOptionPane.showInputDialog("Number of tries at each depth", "10");
+            int it = Integer.parseInt(its);
             //RunProgramOne(new AStar(), 3, 5, 8);
-            p.RunSolveLoop(new AStar(), 3, 5, 8);
+            p.RunSolveLoop(new AStar(), 3, it, pv);
         });
         
         JButton tests = new JButton("Run Unit Tests");
@@ -372,7 +249,6 @@ public class Main {
             p.RunUnitTests();
         });
         
-        panel.add(dataBF,gbc);
         panel.add(dataAS,gbc);
         panel.add(tests, gbc);
         
@@ -384,6 +260,20 @@ public class Main {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
         p.Start();
+    }
+    
+    private static double[] String2Array(String values){
+        String[] split = values.split("\\,");
+        double[] ds = new double[split.length];
+        for(int i = 0; i < split.length; i++){
+            String s = split[i];
+            double d = 0;
+            try{
+                d = Double.parseDouble(s);
+            }catch(Exception e){}
+            ds[i] = d;
+        }
+        return ds;
     }
     
     private static JPanel CreateRotationPanel(Bitmap map, Spin.Mode mode){

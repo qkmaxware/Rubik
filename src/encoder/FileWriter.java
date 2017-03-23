@@ -18,8 +18,8 @@ public class FileWriter {
     
     PrintWriter writer;
     
-    public FileWriter(String filename){
-        filename = GetUniqueFileName(filename);
+    public FileWriter(String filename, String type){
+        filename = GetUniqueFileName(filename, type);
         try{
             writer = new PrintWriter(filename, "UTF-8");
         }catch(IOException e){
@@ -32,13 +32,12 @@ public class FileWriter {
      * @param name
      * @return 
      */
-    public static String GetUniqueFileName(String name){
+    public static String GetUniqueFileName(String name, String type){
         File f = new File(name);
-        String[] parts = Strip(name);
-        String uniquename = parts[0];
+        String uniquename = name+type;
         int unique = 1;
         while(f.exists()){
-            uniquename = parts[0]+"("+(unique++)+")"+parts[1];
+            uniquename = name+"("+(unique++)+")"+type;
             f = new File(uniquename);
         }
         return uniquename;

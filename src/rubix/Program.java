@@ -10,6 +10,7 @@ import encoder.FileWriter;
 import encoder.OnesEncoder;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -26,11 +27,8 @@ import plus.graphics.RenderPanel;
 import plus.graphics.Transform;
 import plus.graphics.gui.Ui;
 import plus.graphics.gui.UiText;
-import plus.machinelearning.NetworkTrainer;
-import plus.machinelearning.ClassicNetwork;
-import plus.machinelearning.NeuralNetwork;
-import plus.machinelearning.Sigmoid;
-import plus.machinelearning.TrainingData;
+import plus.machinelearning.MatrixNetwork;
+import plus.machinelearning.*;
 import plus.math.Mathx;
 import plus.math.Vector3;
 import plus.system.Debug;
@@ -64,7 +62,7 @@ public class Program {
     private ConcurrentLinkedQueue<Integer> newCubeRequests = new ConcurrentLinkedQueue<Integer>(); //Deals with my occasional concurrent modification exception by doing it inside the game loop
     private final AsyncPool jobPool = new AsyncPool(2);
     
-    private ClassicNetwork network;
+    private MatrixNetwork network;
     
     private Game game;
     private GameScene scene;
@@ -258,6 +256,12 @@ public class Program {
         text.origin = Ui.BottomLeft;
         scene.Instanciate(text);
         
+        //Initialize the NN, 324 - 200 - 9 network should be fine... I hope
+        int inputs = 324;
+        int outputs = 9;
+        int[] layers = new int[]{200}; //158
+        NetworkTopology topo = plus.machinelearning.NetworkTopology.Construct(inputs, outputs, layers);
+        this.network = new MatrixNetwork(topo, ActivationFunction.tanh);
     }
     
     public void Start(){
@@ -453,11 +457,41 @@ public class Program {
     
     public void RunSolveLoop(ISearch search, int cubeSize, int iterations, int maxPerturbations){
         Debug.Log("Starting Program: Data Generation... please wait this may take some time");
+        
+        this.jobPool.Enqueue(()->{
+            final rubix.Cube solved = new rubix.Cube(cubeSize);
+            final OnesEncoder encoder = new OnesEncoder();
+            for(int p = 1; p <= maxPerturbations; p++){
+                Debug.Log("--- Solving for "+p+" perturbations");
+                for(int i = 0; i < iterations; i++){
+                    Debug.Log("--- --- Starting iteration "+i);
+                    rubix.Cube cube = new rubix.Cube(cubeSize);
+                    cube.Perturb(p);
+
+                    LinkedList<ISearchable> results = search.FindPath(cube, solved);
+                    results.addFirst(cube);
+
+                    FileWriter writer = new FileWriter(this.DataDir+"/"+search.getClass().getSimpleName()+ "(d"+p+"-#"+i+") on "+cubeSize+"x"+cubeSize,".csv");
+                    for(int k = 0; k < results.size()-1; k++){
+                        rubix.Cube state = (rubix.Cube)results.get(k);
+                        Spin move = ((rubix.Cube)results.get(k+1)).LastSpin();
+                        //Encode and output to file size x size -> rng perterbations #2
+                        String state_encoding = encoder.Encode(state, 6);   // 3x3 * 6 * 6 = 324
+                        String move_encoding = encoder.Encode(move, solved.Length()); //3 values * 3 sized = 9
+                        String encoding = state_encoding+"|"+move_encoding;
+                        writer.WriteLn(encoding);
+                    }  
+                    writer.Save();
+
+                }
+            }
+        });
+        /*
         for(int i = 0; i < iterations; i++){
             Property<Integer> iterationId = new Property<Integer>(i);
             plus.system.functional.Action job = () -> {
                 rubix.Cube solved = new rubix.Cube(cubeSize);
-                OnesEncoder encoder = new OnesEncoder();
+                
                     Debug.Log("Starting iteration " + (iterationId.get()+1)+"/"+(iterations));
                     for(int p = 1; p <= maxPerturbations; p++){
                         Debug.Log("--- Solving for "+p+" perturbations");
@@ -483,27 +517,14 @@ public class Program {
                 Debug.Log("Program Finished");
             };
             jobPool.Enqueue(job);
-        }
-    }
-    
-    public NeuralNetwork CreateNetwork(double bias, int i, int o, int... h){
-        ClassicNetwork.Config con = new ClassicNetwork.Config();
-        con.bias = bias;
-        con.hidden = h;
-        con.inputs = i;
-        con.outputs = o;
-        con.sigmoidFn = Sigmoid.tanh;
-        
-        ClassicNetwork net = new ClassicNetwork(con);
-        this.network = (net);
-        return net;
+        }*/
     }
     
     public void LoadNetwork(String path){
         try{
             List<String> lines = Files.readAllLines(Paths.get(path));
             String i = String.join("\n", lines);
-            ClassicNetwork network = ClassicNetwork.FromJSON((JSONobject)(new JSONparser()).Parse(i)); 
+            //ClassicNetwork network = ClassicNetwork.FromJSON((JSONobject)(new JSONparser()).Parse(i)); 
             this.network = network;
         }catch(Exception ex){
             Debug.Log(ex);
@@ -514,13 +535,9 @@ public class Program {
         if(this.network == null)
             return;
         
+        double[] out = this.network.Feed(ins).GetData();
         
-        double[] out = this.network.Feed(ins);
-        String outs = "";
-        for(int i = 0; i < out.length; i++){
-            outs+=((i != 0)?",":"")+out[i];
-        }
-        Debug.Log(outs);
+        Debug.Log(Arrays.toString(out));
         
     }
     
@@ -528,54 +545,42 @@ public class Program {
         if(data == null)
             return;
         
-        NetworkTrainer bp = new NetworkTrainer();
-        bp.Train(network, 4, 100, 0.1, 0, 0.1, data, data);
+        double[][] input = data.GetInputs();
+        double[][] output = data.GetOutputs();
+        
+        int epochs = 200;
+        int iterations = 200;
+        double accuracy = 0.1;
+        double learningRate = 0.1;
+        
+        this.jobPool.Enqueue(() -> {
+            Debug.Log("Starting Training");
+            boolean trained = SBPtrainer.Train(
+                network, 
+                input, 
+                output, 
+                epochs, 
+                iterations, 
+                accuracy, 
+                learningRate
+            );
+            Debug.Log("Training Complete (accurate: "+trained+")");
+        });
     }
     
     public void SaveActiveNetwork(String name){
         if(this.network == null)
             return;
         
-        FileWriter writer = new FileWriter(this.NetworkDir+"/"+name+".json");
-        writer.WriteLn(this.network.ToJSON().ToJSON());
+        FileWriter writer = new FileWriter(this.NetworkDir+"/"+name, ".json");
+        writer.WriteLn(this.network.ToJSON());
         writer.Save();
         Debug.Log("Network saved to: "+this.NetworkDir+"/"+name+".json");
     }
     
-    public TrainingData CreateTrainingData(String path){
-        TrainingData data = null;
-        try{
-            TrainingData d = new TrainingData();
-            List<String> lines = Files.readAllLines(Paths.get(path));
-            
-            for(String line : lines){
-                String[] lns = line.split("\\|");
-                String in = lns[0];
-                String out = lns[1];
-                
-                String[] ins = in.split(",");
-                double[] ik = new double[ins.length];
-                for(int i = 0; i < ins.length; i++)
-                    ik[i] = Double.parseDouble(ins[i]);
-                
-                String[] outs = out.split(",");
-                double[] ik2 = new double[outs.length];
-                for(int i = 0; i < outs.length; i++)
-                    ik2[i] = Double.parseDouble(outs[i]);
-                
-                d.Add(ik, ik2);
-            }
-            
-            data = d;
-            
-        }catch(Exception ex){
-            Debug.Log(ex);
-        }
-        return data;
-    }
-    
     public NeuralNetwork GetActiveNetwork(){
-        return this.network;
+        //return this.network;
+        return null;
     }
     
     public RenderPanel GetViewport(){

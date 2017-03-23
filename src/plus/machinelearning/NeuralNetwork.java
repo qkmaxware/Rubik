@@ -5,30 +5,16 @@
  */
 package plus.machinelearning;
 
+import plus.math.Matrix;
+
 /**
  *
- * @author Colin Halseth
+ * @author Colin
  */
 public interface NeuralNetwork {
     
-    /**
-     * Provide inputs and perform a feed-forward action to obtain network output 
-     * @param inputs
-     * @return 
-     */
-    public double[] Feed (double[] inputs);
-    
-    /**
-     * Randomize layer connection weights
-     */
     public void Randomize();
-    
-    /**
-     * Perform a single iteration of a learning loop
-     * @param learningRate
-     * @param momentum
-     * @param set 
-     */
-    public void Learn(double learningRate, double momentum, TrainingData.Pair set);
+    public Matrix Feed(double[] input);
+    public void Backpropagate(double[] inputs, double[] outputs, double eta);
     
 }

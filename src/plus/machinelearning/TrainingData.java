@@ -5,64 +5,63 @@
  */
 package plus.machinelearning;
 
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import plus.system.functional.Action2;
 
 /**
  *
- * @author Colin Halseth
+ * @author Colin
  */
 public class TrainingData {
-    
-    public static class Pair{
+ 
+    private class Pair{
         double[] in;
         double[] out;
+        String hash;
     }
     
-    private ArrayList<Pair> data = new ArrayList<Pair>();
+    private HashSet<String> contains = new HashSet<String>();
+    private LinkedList<Pair> set = new LinkedList<Pair>();
     
-    public int Count(){
-        return data.size();
-    }
-    
-    public void Add(double[] in, double[] out){
+    public boolean Add(double[] in, double[] out){
         Pair p = new Pair();
-        p.in = in; p.out = out;
-        data.add(p);
-    }
-    
-    public Pair Get(int i){
-        return this.data.get(i);
-    }
-    
-    public double[] GetInput(int i){
-        return this.data.get(i).in;
-    }
- 
-    public double[] GetOutput(int i){
-        return this.data.get(i).out;
-    }
-    
-    public ArrayList<Pair> Random(){
-        ArrayList<Pair> rando = new ArrayList<Pair>(this.data.size());
+        p.in = in;
+        p.out = out;
+        p.hash = Arrays.toString(in);
         
-        
-        return rando;
-    }
-    
-    public String toString(){
-        StringBuilder builder = new StringBuilder();
-        for(Pair p : data){
-            for(int i = 0; i < p.in.length; i++){
-                builder.append(p.in[i]);
-                builder.append(",");
-            }
-            builder.append("|");
-            for(int i = 0; i < p.out.length; i++){
-                builder.append(p.out[i]);
-                builder.append(",");
-            }
+        if(!contains.contains(p.hash)){
+            set.add(p);
+            contains.add(p.hash);
+            return true;
         }
-        return builder.toString();
+        return false;
+    }
+    
+    public void Clear(){
+        contains.clear();
+        set.clear();
+    }
+    
+    public double[][] GetInputs(){
+        double[][] o = new double[set.size()][];
+        int i = 0;
+        for(Pair p : set){
+            o[i] = p.in;
+            i++;
+        }
+        return o;
+    }
+    
+    public double[][] GetOutputs(){
+        double[][] o = new double[set.size()][];
+        int i = 0;
+        for(Pair p : set){
+            o[i] = p.out;
+            i++;
+        }
+        return o;
     }
     
 }

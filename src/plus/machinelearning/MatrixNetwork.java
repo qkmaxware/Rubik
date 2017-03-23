@@ -5,219 +5,199 @@
  */
 package plus.machinelearning;
 
-import java.util.Arrays;
+import java.util.Random;
+import java.util.Scanner;
+import plus.JSON.JSONproperty;
 import plus.math.Matrix;
-import plus.system.Debug;
-import plus.system.Random;
 
 /**
- * TODO bias and momentum
+ *
  * @author Colin
  */
-public class MatrixNetwork {
+public class MatrixNetwork implements NeuralNetwork, JSONproperty{
+
+    private double bias = 1;
+    private int size = 0;
     
-    public static class Config{
-        
-        public double bias;
-        public int inputs;
-        public int outputs;
-        public int[] hidden;
-        public Sigmoid sigmoidFn;
-        
-        public Config(){}
-        public static Config GetDefaults(){
-            Config Default = new Config();
-            Default.bias = 1;
-            Default.hidden = new int[]{2};
-            Default.sigmoidFn = Sigmoid.tanh;
-            return Default;
-        }
-    }
-    
-    private int inputs;
-    private int outputs;
-    private Sigmoid activationFn;
-    
-    private Config initialConfig;
-    
-    private int size;
     private Matrix[] weights;
+    private Matrix[] biases;
     private Matrix[] Xs;
+    private Matrix[] Ss;
     private Matrix[] Zs;
-    private Matrix[] As;
     
-    public static void main(String[] args){
-        Config conf = new Config();
-        conf.inputs = 2;
-        conf.hidden = new int[]{3};
-        conf.outputs = 1;
-        conf.sigmoidFn = Sigmoid.tanh;
-        
-        MatrixNetwork net = new MatrixNetwork(conf);
-        Debug.Log(net.weights.length);
-        
-        
-        //Not working
-        Matrix data = new Matrix(new double[][]{
-            {-1,-1},
-            {-1, 1},
-            { 1,-1},
-            { 1, 1}
-        });
-        Matrix results = Matrix.Column(new double[]{-1,1,1,-1});
-        
-        
-        /*
-        //Working data
-        Matrix data = new Matrix(new double[][]{
-            {0,0},
-            {0,1},
-            {1,0},
-            {1,1}
-        });
-        Matrix results = Matrix.Column(new double[]{0,1,1,0});
-        */
-        for(int i = 0; i < 1000; i++){
-            net.Learn(0.1, 0, data, results);
-            Matrix a = net.Feed(data);
-            //Debug.Log(i+": "+a.toString());
-        }
-        Matrix test = (net.Feed(data));
-        Debug.Log("real");
-        Debug.Log(results);
-        Debug.Log("calculated");
-        Debug.Log(test);
-        Debug.Log("error");
-        Debug.Log(results.sub(test).operate((in) -> {return (double)Math.round(in);}));
-    }
+    private NetworkTopology topology;
+    private ActivationFunction activation;
     
-    public MatrixNetwork(Config conf){
-        this.inputs = Math.max(1, conf.inputs); //At least one input
-        this.outputs = Math.max(1, conf.outputs);//At least one output 
-        this.activationFn = conf.sigmoidFn;
+    //TODO make activation function matter
+    public MatrixNetwork(NetworkTopology topology, ActivationFunction fn){
+        this.topology = topology;
+        this.activation = fn;
         
-        //Develop hidden layer weight matrices
-        this.weights = new Matrix[Math.max(1,conf.hidden.length) + 1];
-        int layerSize = this.inputs;
-        for(int i = 0; i < weights.length - 1; i++){
-            //Matrix from i-1 to i
-            Matrix w = Matrix.Random(layerSize, conf.hidden[i]);
-            weights[i] = w;
-            layerSize = conf.hidden[i];
+        int inputSize = topology.GetInputSize(); //2;//topology.GetInputSize();
+        int outputSize = topology.GetOutputSize();//1;//topology.GetOutputSize();
+        int[] layers = topology.GetLayerSizes();//new int[]{2,outputSize};//topology.GetLayerSizes();    //Hiddenlayers
+        
+        this.weights = new Matrix[layers.length];
+        this.biases = new Matrix[layers.length];
+        this.Xs = new Matrix[layers.length];
+        this.Ss = new Matrix[layers.length];
+        this.Zs = new Matrix[layers.length];
+        
+        int height = inputSize;
+        for(int i = 0; i < this.weights.length; i++){
+            this.weights[i] = new Matrix(height,layers[i]);
+            this.biases[i] = new Matrix(1,layers[i]);
+            height = layers[i];
+            
         }
-        Matrix wo = Matrix.Random(layerSize, this.outputs);
-        weights[weights.length - 1] = wo;
         
-        //Final storage cleanup
-        Xs = new Matrix[this.weights.length];
-        Zs = new Matrix[this.weights.length];
-        As = new Matrix[this.weights.length]; 
+        Randomize(); 
         
         size = this.weights.length;
         
-        //Properly randomize weights
-        Randomize();
     }
     
-    public void Randomize() {
-        for(int i = 0; i < this.weights.length; i++){
-            Matrix w = this.weights[i];
+    public Matrix[] GetWeights(){
+        return weights;
+    }
+    
+    public Matrix[] GetBiases(){
+        return biases;
+    }
+    
+    public static Random rng = new Random(); 
+    
+    public static double Range(double min, double max){
+        double t = rng.nextDouble();
+        return (1 - t) * min + t * max;
+    }
+    
+    public void Randomize(){
+        for(int i = 0; i < size; i++){
+            this.weights[i] = this.weights[i].operate((in) -> {return Range(-1,1);});
+            this.biases[i] = this.biases[i].operate((in) -> {return Range(-1,1);});
+        }
+    }
+    
+    public Matrix Feed(double[] in){
+        this.Xs[0] = Matrix.Row(in);
+        
+        for(int i = 0; i < weights.length; i++){
+            Matrix X = this.Xs[i];
+            Matrix B = this.biases[i].operate((v) -> {return v * bias;});
+            Matrix W = this.weights[i];
             
-            int ins = w.GetWidth();
-            float r = (float)(1.0/Math.sqrt(ins));
-            w.operate((in) -> {
-                return (double)Random.Range(-r, r);
+            Matrix S = (X.mul(W)).add(B);
+            this.Ss[i] = S;
+            
+            Matrix Z = S.operate((v) -> {
+                //return sigmoid(v);
+                return this.activation.ApplyFunction(v);
             });
+            this.Zs[i] = Z;
+            
+            if(i != weights.length - 1)
+                Xs[i+1] = Z;
         }
+        
+        return this.Zs[this.Zs.length - 1];
     }
     
-    public Matrix Feed(double[] feature){
-        return Feed(Matrix.Row(feature));
+    public void Backpropagate(double[] inputs, double[] outputs, double eta){
+        Matrix predicted = Feed(inputs);
+        Matrix actual = Matrix.Row(outputs);
+        
+        double[][] del = new double[size][];
+        double[][] dwb = new double[size][];
+        double[][][] dw = new double[size][][];
+        
+        //For each neuron in the output layer
+        double[] delta3 = new double[predicted.GetWidth()];
+        double[][] dw2 = new double[this.weights[size - 1].GetHeight()][this.weights[size - 1].GetWidth()];
+        double[] dwb2 = new double[this.biases[size - 1].GetWidth()];
+        for(int i = 0; i < predicted.GetWidth(); i++){
+            //delta3[i] = (actual.Get(0, i) - predicted.Get(0, i)) * sigmoidPrime(this.Ss[size - 1].Get(0, i));
+            delta3[i] = (actual.Get(0, i) - predicted.Get(0, i)) * this.activation.ApplyDerivative(this.Ss[size - 1].Get(0, i));
+        }
+        for(int r = 0; r < dw2.length; r++){
+            for(int c = 0; c < dw2[r].length; c++){
+                dw2[r][c] = eta * delta3[c] * this.Xs[size - 1].Get(0, r); //Discrepancy here between this and previous 'c' for 'r'
+            }
+        }
+        for(int i = 0; i < this.biases[size - 1].GetWidth(); i++){
+            dwb2[i] = eta * delta3[i] * bias;
+        }
+        del[size - 1] = delta3;
+        dw[size - 1] = dw2;
+        dwb[size - 1] = dwb2;
+        
+        for(int l = size - 2; l >= 0; l--){
+            //For each neuron in the hidden layer
+            double[] delta2 = new double[this.Zs[l].GetWidth()];
+            double[][] dw1 = new double[this.weights[l].GetHeight()][this.weights[l].GetWidth()];
+            double[] dwb1 = new double[this.biases[l].GetWidth()];
+            for(int i = 0; i < delta2.length; i++){
+                double sum = 0;
+                for(int c = 0; c < this.weights[l+1].GetWidth(); c++){
+                    sum += this.weights[l+1].Get(i, c) * del[l+1][c]; //delta3[c];
+                }
+                //delta2[i] = sigmoidPrime(this.Ss[l].Get(0,i)) * sum;
+                delta2[i] = this.activation.ApplyDerivative(this.Ss[l].Get(0,i)) * sum;
+            }
+            
+            for(int r = 0; r < dw1.length; r++){
+                for(int c = 0; c < dw1[r].length; c++){
+                    dw1[r][c] = eta * delta2[c] * Xs[l].Get(0, r); //ERROR on DIMENTIONALITY
+                }
+            }
+            for(int i = 0; i < this.biases[l].GetWidth(); i++){
+                dwb1[i] = eta * delta2[i] * bias;
+            }
+            
+            del[l] = delta2;
+            dw[l] = dw1;
+            dwb[l] = dwb1;
+        }
+        
+        //Apply weights
+        for(int i = 0; i < dw.length; i++){
+            this.weights[i] = this.weights[i].add(new Matrix(dw[i]));
+            this.biases[i] = this.biases[i].add(Matrix.Row(dwb[i]));
+        }
+        
     }
     
-    public Matrix Feed(Matrix inputs){
-        //      Features
-        // Ex1 [a, b, c]
-        // Ex2 [d, e, f]
-        // Ex3 [g, h , i]
-        Matrix X = inputs;
-        Matrix W = null;
-        Matrix Z = null;
-        Matrix A = null;
+    public double sigmoid(double x){
+        double r = 1.7 * Math.tanh(0.6*x);
+        return r;
+    }
+    
+    public double sigmoidPrime(double x){
+        //4.08 * (Math.cosh(0.6*x) * Math.cosh(0.6*x)) / ((Math.cosh(1.2 * x) + 1) * (Math.cosh(1.2 * x) + 1))
+        double r = 4.08 * (Math.cosh(0.6*x) * Math.cosh(0.6*x)) / ((Math.cosh(1.2 * x) + 1) * (Math.cosh(1.2 * x) + 1));
+        return r;
+    }
+ 
+    @Override
+    public String ToJSON() {
+        StringBuilder s = new StringBuilder();
+        s.append("{\"bias\":"+this.bias+", \"layers\": [");
         
         for(int i = 0; i < this.weights.length; i++){
-            Xs[i] = X; // Input layer is input for hidden layer 1(id = 0)
+            s.append(((i != 0)?",":"")+"{");
             
-            W = this.weights[i]; //Weight from layer i-1 to i
-            Z = Matrix.mul(X, W);
-            A = Z.operate(this.activationFn.GetFunction());
-            X = A;
+            s.append("\"weight\":");
+            s.append("\""+this.weights[i].toString()+"\"");
+            s.append(",");
             
-            Zs[i] = Z;
-            As[i] = A;
+            s.append("\"bias\":");
+            s.append("\""+this.biases[i].toString()+"\"");
+            
+            s.append("}");
         }
         
-        return Z;
+        s.append("]}");
+        return s.toString();
     }
     
-    public void Learn(double learningRate, double momentum, Matrix input, Matrix output){
-        Matrix[] costs = CalculateCosts(input, output);
-        Matrix[] updates = Scale(-learningRate, costs);
-        UpdateWeights(momentum, updates);
-    }
-    
-    public Matrix[] CalculateCosts(Matrix inputs, Matrix outputs){
-        //Gradient dJdW (i) should be same size as W(i)
-        Matrix test = Feed(inputs);
-        Matrix expected = outputs;
-        
-        Matrix[] ds = new Matrix[size];
-        Matrix[] dJs = new Matrix[size];
-        
-        //For output layer
-        Matrix hhout = Xs[size - 1].Transpose(); //hidden out = this in (before weights)
-        Matrix d3 = Matrix.operate(
-                test.sub(expected), //add? sub?
-                Zs[size - 1].operate(this.activationFn.GetDerivative()),
-                (a,b) -> {return a * b;}
-        );
-        
-        Matrix dsw2 = Matrix.mul(hhout, d3);
-        
-        ds[size - 1] = d3;
-        dJs[size - 1] = dsw2;
-        
-        //Hidden layers
-        for(int i = size - 2; i >= 0; i--){
-            Matrix finaledges = weights[i+1].Transpose();
-            Matrix hiddenlayerin = Zs[i].operate(this.activationFn.GetDerivative());
-            Matrix trans = Xs[i].Transpose();
-            
-            Matrix d2 = Matrix.operate(
-                    Matrix.mul(ds[i+1], finaledges),
-                    hiddenlayerin, 
-                    (a,b) -> {return a * b;}
-            );
-            Matrix dsw1 = Matrix.mul(trans, d2);
-            
-            ds[i] = d2;
-            dJs[i] = dsw1;
-        }
-        
-        return dJs;
-    }
-    
-    public Matrix[] Scale(double rate, Matrix[] ms){
-        Matrix[] s = new Matrix[ms.length];
-        for(int i = 0; i < ms.length; i++){
-            s[i] = ms[i].scale(rate);
-        }
-        return s;
-    }
-    
-    public void UpdateWeights(double momentum, Matrix[] deltas){
-        for(int i = 0; i < Math.min(this.weights.length, deltas.length); i++){
-            this.weights[i] = this.weights[i].add(deltas[i]);
-        }
-    }
 }
